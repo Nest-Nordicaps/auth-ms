@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { PrismaClient } from 'generated/prisma';
+import { PrismaClient } from '@prisma/client';
 
 import * as bcrypt from 'bcrypt';
 
@@ -8,6 +8,8 @@ import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { RegisterUserDto } from './dto/register-user.dto';
 import { LoginUserDto } from './dto/login-user.dto';
 import { error } from 'console';
+import { envs } from 'src/config';
+import { RpcException } from '@nestjs/microservices';
 
 @Injectable()
 export class AuthService extends PrismaClient implements OnModuleInit {
@@ -25,6 +27,26 @@ export class AuthService extends PrismaClient implements OnModuleInit {
   //METODO PARA GENERAR TOKEN
   async sygnJWT(payload: JwtPayload) {
     return this.jwtService.sign(payload);
+  }
+
+  async verifyToken(token: string) {
+    try {
+      const { sub, iat, exp, ...user } = this.jwtService.verify(token, {
+        secret: envs.jwtSecret,
+      }); // Verificamos que el token sea valido
+
+      //Retornamos el user y el nuevo token
+      return {
+        user: user,
+        token: await this.sygnJWT(user),
+      };
+    } catch (error) {
+      console.log(error);
+      throw new RpcException({
+        status: 401,
+        message: 'Invalid token',
+      });
+    }
   }
 
   //METODO PARA REGISTRAR USUARIOS
